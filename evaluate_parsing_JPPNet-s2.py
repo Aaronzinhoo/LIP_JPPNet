@@ -1,11 +1,13 @@
+#!/bin/bash/env 
+
 from __future__ import print_function
-import argparse
 from datetime import datetime
 import os
-import sys
 import time
-import scipy.misc
 import cv2
+import sys
+import argparse
+import glob
 from PIL import Image
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
@@ -13,27 +15,89 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from utils import *
+from utils.utils import *
 from LIP_model import *
 
+
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.30)
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+
+parser = argparse.ArgumentParser(description = "classify clothes")
+parser.add_argument('--input_dir' , default='./' , type=str, help="dir of original images")
+parser.add_argument('--output_dir' , default='./output',type=str,help="output dir for results")
+parser.add_argument('--buffer_size', default=500)
+parser.add_argument('--interval_size', default=20)
+parser.add_argument('--label_file' , default=1)
+parser.add_argument('--pattern', '-p',action='store_true',
+                    help='create output for pattern detection script to read from')
+args = parser.parse_args()
+
 N_CLASSES = 20
+# was 384
 INPUT_SIZE = (384, 384)
-DATA_DIRECTORY = './datasets/examples'
-DATA_LIST_PATH = './datasets/examples/list/val.txt'
-NUM_STEPS = 6 # Number of images in the validation set.
-RESTORE_FROM = './checkpoint/JPPNet-s2'
-OUTPUT_DIR = './output/parsing/val'
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
+
+#number of IMAGES in dir
+DATA_LIST_PATH_ROOT = 'LIP_JPPNet/datasets/examples/list/'
+RESTORE_FROM = 'LIP_JPPNet/checkpoint'
+LABELS = ['top', 'bottom', 'full']
 
 def main():
     """Create the model and start the evaluation process."""
+    DATA_LIST_PATH=os.path.join(DATA_LIST_PATH_ROOT, 'val'+str(args.label_file)+'.txt')
     
+    pattern_output_dir=''
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    for label in LABELS:
+        label_output = os.path.join(args.output_dir, label)
+        if not os.path.exists(label_output):
+            os.mkdir(label_output)
+    if args.pattern:
+        pattern_output_dir = args.output_dir + '_pattern'
+        if not os.path.exists(pattern_output_dir):
+            os.makedirs(pattern_output_dir)
+        for label in LABELS:
+            label_output = os.path.join(pattern_output_dir, label)
+            if not os.path.exists(label_output):
+                os.mkdir(label_output)
+                
+    # if you want just the filenames sorted, simply remove the dir from each
+    interval_size = int(args.interval_size)
+    buffer_end = int(args.buffer_size)
+    buffer_start = buffer_end-interval_size
+
+    # sort the directory contents by why they were created in the dir
+    # image paths are relatove paths !!
+    DATA_DIRECTORY = args.input_dir
+    image_list = os.listdir(DATA_DIRECTORY)
+    full_list = [os.path.join(DATA_DIRECTORY, i) for i in image_list]
+    # sort files by time created
+    time_sorted_list = sorted(full_list, key=os.path.getctime)
+    # relative sorted path
+    sorted_filename_list = [ os.path.basename(i) for i in time_sorted_list]
+    # only get images up to the buffer size
+    DATA_LIST = sorted_filename_list[buffer_start :buffer_end]
+    NUM_STEPS = 0
+    
+    # create label file for data loader and get number of IMAGES
+    # image is concatenated with DATA_DIRECTORY in ImageReader init function!
+    with open(DATA_LIST_PATH, 'w+') as f:
+        for image in DATA_LIST:
+            if image.split('.')[-1] in ['jpg','png','jpeg']:
+                f.write('/'+image+'\n')
+                NUM_STEPS += 1
+                
+    print("YOU HAVE THIS MANY ACTUAL IMAGES ",NUM_STEPS)
+    if NUM_STEPS==0:
+        print("Exiting Since no Images Found")
+        return -1
     # Create queue coordinator.
     coord = tf.train.Coordinator()
     h, w = INPUT_SIZE
     # Load reader.
     with tf.name_scope("create_inputs"):
-        reader = ImageReader(DATA_DIRECTORY, DATA_LIST_PATH, None, False, False, coord)
+        reader = ImageReader(DATA_DIRECTORY, DATA_LIST_PATH, None, False, False,
+                             coord, buffer_end, int(args.interval_size))
         image = reader.image
         image_rev = tf.reverse(image, tf.stack([1]))
         image_list = reader.image_list
@@ -137,21 +201,35 @@ def main():
     
     # Start queue threads.
     threads = tf.train.start_queue_runners(coord=coord, sess=sess)
-
-
+    #print(image_list , "     ", len(image_list))
+    print("Prediciting Now")
     # Iterate over training steps.
     for step in range(NUM_STEPS):
         parsing_ = sess.run(pred_all)
         if step % 100 == 0:
             print('step {:d}'.format(step))
-            print (image_list[step])
+            print(image_list[step])
         img_split = image_list[step].split('/')
-        img_id = img_split[-1][:-4]
-
-        msk = decode_labels(parsing_, num_classes=N_CLASSES)
-        parsing_im = Image.fromarray(msk[0])
-        parsing_im.save('{}/{}_vis.png'.format(OUTPUT_DIR, img_id))
-        cv2.imwrite('{}/{}.png'.format(OUTPUT_DIR, img_id), parsing_[0,:,:,0])
+        #TODO save this 
+        img_id , img_ext = img_split[-1].split('.')
+        img_path = os.path.join(DATA_DIRECTORY, img_id+".{}".format(img_ext))
+        
+        msk = crop_images(img_path, parsing_)
+        if msk.size != 0:
+            for cropped_img, class_idx in msk:
+                label = LABELS[class_idx]
+                parsing_im = Image.fromarray(cropped_img)
+                color_output = os.path.join(args.output_dir,label,img_id)
+                parsing_im.save('{}_vis.{}'.format(color_output,img_ext))
+                if args.pattern:
+                    pattern_output = os.path.join(pattern_output_dir,label,img_id)
+                    parsing_im.save('{}_vis.{}'.format(pattern_output,img_ext))
+                #cv2.imwrite('{}/{}/{}.png'.format(args.output_dir, label, img_id), cropped_img)
+        # for producing segmentation image
+        #msk = decode_labels(parsing_, num_classes=N_CLASSES)
+        #parsing_im = Image.fromarray(msk[0])
+        #parsing_im.save('{}/{}_vis.png'.format(OUTPUT_DIR, img_id))
+        #cv2.imwrite('{}/{}.png'.format(OUTPUT_DIR, img_id), parsing_[0,:,:,0])
 
     coord.request_stop()
     coord.join(threads)

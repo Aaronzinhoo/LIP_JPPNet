@@ -8,16 +8,19 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 from utils import *
 from LIP_model import *
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import imread
 import scipy.misc
 import scipy.io as sio
+import cv2
+# using cv2 and matplotib instead of scipy
 
 
-NUM_STEPS = 6 # Number of images in the validation set.
+NUM_STEPS = 1 # Number of images in the validation set.
 INPUT_SIZE = (384, 384)
 N_CLASSES = 20
-DATA_DIRECTORY = './datasets/examples'
+DATA_DIRECTORY = './datasets/examples/images/'
 DATA_LIST_PATH = './datasets/examples/list/val.txt'
-RESTORE_FROM = './checkpoint/JPPNet-s2'
+RESTORE_FROM = './checkpoint'
 OUTPUT_DIR = './output/pose/val'
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -139,7 +142,7 @@ def main():
     for step in range(NUM_STEPS):
         predict_ = sess.run(output_all)
         save_lip_images(image_list[step], predict_, OUTPUT_DIR)
-        if step % 100 == 0:
+        if step % 5 == 0:
             print('step {:d}'.format(step))
             print (image_list[step])
 
@@ -148,18 +151,18 @@ def main():
    
 
 def save_lip_images(image_path, samples, out_dir):
-    img_A = scipy.misc.imread(image_path).astype(np.float)
+    img_A = imread(image_path).astype(np.float)
     rows = img_A.shape[0]
     cols = img_A.shape[1]
     image = samples[0]
     img_split = image_path.split('/')
     img_id = img_split[-1][:-4]
     with open('{}/{}.txt'.format(out_dir, img_id), 'w') as f:
-        for p in xrange(image.shape[2]):
+        for p in range(image.shape[2]):
             channel_ = image[:,:,p]
             if channel_.shape[0] != rows or channel_.shape[1] != cols:
                 print ('sizes do not match...')
-                channel_ = scipy.misc.imresize(channel_, [rows, cols], interp='nearest')
+                channel_ = cv2.imresize(channel_, [rows, cols], interp=cv2.INTER_NEAREST)
             r_, c_ = np.unravel_index(channel_.argmax(), channel_.shape)
             f.write('%d %d ' % (int(c_), int(r_)))
 

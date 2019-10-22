@@ -2,4 +2,8 @@ checkpoint/
 output/
 logs/
 model/
+datasets/examples/list/
 *.pyc
+*.orig
+*.txt
+*.patch

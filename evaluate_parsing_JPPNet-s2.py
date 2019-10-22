@@ -213,24 +213,20 @@ def main():
         #TODO save this 
         img_id , img_ext = img_split[-1].split('.')
         img_path = os.path.join(DATA_DIRECTORY, img_id+".{}".format(img_ext))
-        
-        msk = crop_images(img_path, parsing_)
-        if msk.size != 0:
-            for cropped_img, class_idx in msk:
-                label = LABELS[class_idx]
-                parsing_im = Image.fromarray(cropped_img)
-                color_output = os.path.join(args.output_dir,label,img_id)
-                parsing_im.save('{}_vis.{}'.format(color_output,img_ext))
-                if args.pattern:
-                    pattern_output = os.path.join(pattern_output_dir,label,img_id)
-                    parsing_im.save('{}_vis.{}'.format(pattern_output,img_ext))
-                #cv2.imwrite('{}/{}/{}.png'.format(args.output_dir, label, img_id), cropped_img)
-        # for producing segmentation image
-        #msk = decode_labels(parsing_, num_classes=N_CLASSES)
-        #parsing_im = Image.fromarray(msk[0])
-        #parsing_im.save('{}/{}_vis.png'.format(OUTPUT_DIR, img_id))
-        #cv2.imwrite('{}/{}.png'.format(OUTPUT_DIR, img_id), parsing_[0,:,:,0])
-
+        try:
+            msk = crop_images(img_path, parsing_)
+            if msk.size != 0:
+                for cropped_img, class_idx in msk:
+                    label = LABELS[class_idx]
+                    parsing_im = Image.fromarray(cropped_img)
+                    color_output = os.path.join(args.output_dir,label,img_id)
+                    parsing_im.save('{}_vis.{}'.format(color_output,img_ext))
+                    if args.pattern:
+                        pattern_output = os.path.join(pattern_output_dir,label,img_id)
+                        parsing_im.save('{}_vis.{}'.format(pattern_output,img_ext))
+        except:
+            print("Skipped Image {}".format(img_id))
+            continue
     coord.request_stop()
     coord.join(threads)
     

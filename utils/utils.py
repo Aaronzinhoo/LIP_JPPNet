@@ -63,6 +63,8 @@ def crop_images(img_path, mask, num_images=1,num_classes=20):
     
     #create a copy of the original image
     image = Image.open(img_path)
+    if len(image.split()) == 4 or image.mode == 'RGBA':
+        image = image.convert('RGB')
     image_array = np.array(image) # should remove [] if you have more than one image
     image_array = image_array.reshape(1,image_array.shape[0],image_array.shape[1],
                                       image_array.shape[2])

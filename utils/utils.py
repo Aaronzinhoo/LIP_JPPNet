@@ -90,7 +90,43 @@ def crop_images(img_path, mask, num_images=1,num_classes=20):
                 image_copy = np.where(image_mask, label_colours[0], image_copy)
                 outputs.append((image_copy[0,:,:,:].astype('uint8'), j))
     return np.array(outputs)
+
+def crop_all(img_path, mask, num_images=1,num_classes=20):
+    """ Black out the original image where the pixels are categorized as unimportant objects"""
+
+    n, h, w, c = mask.shape
+    assert(n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (n, num_images)
     
+    #create a copy of the original image
+    image = Image.open(img_path)
+    if len(image.split()) == 4 or image.mode == 'RGBA':
+        image = image.convert('RGB')
+    image_array = np.array(image) # should remove [] if you have more than one image
+    image_array = image_array.reshape(1,image_array.shape[0],image_array.shape[1],
+                                      image_array.shape[2])
+    #conditions to mask the images clothing
+    top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
+    bottom_mask_cond = [mask != pants_index, mask != skirt_index]
+    full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
+    conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
+
+    # group the clothing category indexes
+    indexes = [tops_index, bottoms_index, full_index]
+    
+    outputs = []
+    #create a blank outfile file for the mask
+    for i in range(num_images):
+        for j, mask_cond in enumerate(conditions):
+            # zero out objects that arent top/bottom/full
+            clothes_idx = indexes[j]
+            result = any(elem in mask  for elem in clothes_idx)
+            if result:
+                image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
+                image_copy = image_array.copy()
+                image_copy = np.where(image_mask, label_colours[0], image_copy)
+                outputs.append((image_copy[0,:,:,:].astype('uint8'), j))
+    return np.array(outputs)
+
 def prepare_label(input_batch, new_size, one_hot=True):
     """Resize masks and perform one-hot encoding.
 

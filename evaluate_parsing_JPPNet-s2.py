@@ -14,7 +14,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import *
+#from utils import *
 from utils.utils import *
 from LIP_model import *
 
@@ -28,6 +28,8 @@ parser.add_argument('--output_dir' , default='./output',type=str,help="output di
 parser.add_argument('--buffer_size', default=500)
 parser.add_argument('--interval_size', default=20)
 parser.add_argument('--label_file' , default=1)
+parser.add_argument('--labels' , default=None)
+parser.add_argument('--classes' , default="LIP",help="Possible classes are fashion or LIP")
 parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
 args = parser.parse_args()
@@ -39,12 +41,21 @@ INPUT_SIZE = (384, 384)
 #number of IMAGES in dir
 DATA_LIST_PATH_ROOT = 'LIP_JPPNet/datasets/examples/list/'
 RESTORE_FROM = 'LIP_JPPNet/checkpoint'
-LABELS = ['top', 'bottom', 'full']
+
 
 def main():
     """Create the model and start the evaluation process."""
+    LABELS=[]
+    # grab the labels from user file
+    if not args.labels is None:
+        with open(args.labels, 'r') as f:
+            for line in f:
+                LABELS.append(line)
+    else:
+        LABELS = ['top', 'bottom', 'full']
+    #print("USING LABELS: ", LABELS)
+
     DATA_LIST_PATH=os.path.join(DATA_LIST_PATH_ROOT, 'val'+str(args.label_file)+'.txt')
-    
     pattern_output_dir=''
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -214,7 +225,10 @@ def main():
         img_id , img_ext = img_split[-1].split('.')
         img_path = os.path.join(DATA_DIRECTORY, img_id+".{}".format(img_ext))
         try:
-            msk = crop_images(img_path, parsing_)
+            if args.classes == 'LIP':
+                msk = crop_all(img_path, parsing_)
+            else:
+                msk = crop_images(img_path, parsing_)
             if msk.size != 0:
                 for cropped_img, class_idx in msk:
                     label = LABELS[class_idx]

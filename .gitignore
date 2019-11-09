@@ -2,6 +2,7 @@ checkpoint/
 output/
 logs/
 model/
+results/
 datasets/examples/list/
 *.pyc
 *.orig

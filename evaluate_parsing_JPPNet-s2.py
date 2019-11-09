@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 #from utils import *
 from utils.utils import *
 from LIP_model import *
-
+from utils.image_reader import ImageReader
+from utils.model import JPPNetModel
 
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.30)
 sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
@@ -25,21 +26,21 @@ sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 parser = argparse.ArgumentParser(description = "classify clothes")
 parser.add_argument('--input_dir' , default='./' , type=str, help="dir of original images")
 parser.add_argument('--output_dir' , default='./output',type=str,help="output dir for results")
-parser.add_argument('--buffer_size', default=500)
-parser.add_argument('--interval_size', default=20)
+parser.add_argument('--buffer_size', default=500,help='current size of dir')
+parser.add_argument('--interval_size', default=20,help='max size that jpp should process')
 parser.add_argument('--label_file' , default=1)
-parser.add_argument('--labels' , default=None)
-parser.add_argument('--classes' , default="LIP",help="Possible classes are fashion or LIP")
+parser.add_argument('--classes' , default="fashion",help="Possible classes are fashion or LIP")
 parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
+parser.add_argument('--save_source', '-s',action='store_true',help='store original images in dir')
 args = parser.parse_args()
 
 N_CLASSES = 20
-# was 384
 INPUT_SIZE = (384, 384)
 
 #number of IMAGES in dir
 DATA_LIST_PATH_ROOT = 'LIP_JPPNet/datasets/examples/list/'
+DATA_LIST_PATH=os.path.join(DATA_LIST_PATH_ROOT, 'val'+str(args.label_file)+'.txt')
 RESTORE_FROM = 'LIP_JPPNet/checkpoint'
 
 
@@ -47,32 +48,26 @@ def main():
     """Create the model and start the evaluation process."""
     LABELS=[]
     # grab the labels from user file
-    if not args.labels is None:
-        with open(args.labels, 'r') as f:
+    if args.classes == 'lip':
+        with open('LIP_JPPNet/labels/lip_labels.txt', 'r') as f:
             for line in f:
-                LABELS.append(line)
-    else:
+                LABELS.append(line.strip('\n'))
+                
+    elif args.classes == 'fashion':
         LABELS = ['top', 'bottom', 'full']
-    #print("USING LABELS: ", LABELS)
+    else:
+        print("Error No Class Given")
+        sys.exit(1)
 
-    DATA_LIST_PATH=os.path.join(DATA_LIST_PATH_ROOT, 'val'+str(args.label_file)+'.txt')
     pattern_output_dir=''
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-    for label in LABELS:
-        label_output = os.path.join(args.output_dir, label)
-        if not os.path.exists(label_output):
-            os.mkdir(label_output)
+    make_dir_heirarchy(args.output_dir,LABELS)
     if args.pattern:
         pattern_output_dir = args.output_dir + '_pattern'
-        if not os.path.exists(pattern_output_dir):
-            os.makedirs(pattern_output_dir)
-        for label in LABELS:
-            label_output = os.path.join(pattern_output_dir, label)
-            if not os.path.exists(label_output):
-                os.mkdir(label_output)
-                
+        make_dir_heirarchy(pattern_output_dir,LABELS)
+        
     # if you want just the filenames sorted, simply remove the dir from each
+    # buffer size is current index of last element in buffer
+    # interval size is the size of the buffer jpp will categorize
     interval_size = int(args.interval_size)
     buffer_end = int(args.buffer_size)
     buffer_start = buffer_end-interval_size
@@ -86,12 +81,18 @@ def main():
     time_sorted_list = sorted(full_list, key=os.path.getctime)
     # relative sorted path
     sorted_filename_list = [ os.path.basename(i) for i in time_sorted_list]
-    # only get images up to the buffer size
-    DATA_LIST = sorted_filename_list[buffer_start :buffer_end]
-    NUM_STEPS = 0
+    # only get images up to the buffer size if needed
+    DATA_LIST=None
+    if len(sorted_filename_list[buffer_start:]) < interval_size:
+        DATA_LIST = sorted_filename_list[buffer_start:]
+    else:
+        DATA_LIST = sorted_filename_list[buffer_start : buffer_end]
+    
     
     # create label file for data loader and get number of IMAGES
     # image is concatenated with DATA_DIRECTORY in ImageReader init function!
+    # filter videos (mainly for security when not using fullbody detection)
+    NUM_STEPS = 0
     with open(DATA_LIST_PATH, 'w+') as f:
         for image in DATA_LIST:
             if image.split('.')[-1] in ['jpg','png','jpeg']:
@@ -108,7 +109,7 @@ def main():
     # Load reader.
     with tf.name_scope("create_inputs"):
         reader = ImageReader(DATA_DIRECTORY, DATA_LIST_PATH, None, False, False,
-                             coord, buffer_end, int(args.interval_size))
+                             coord, buffer_end)
         image = reader.image
         image_rev = tf.reverse(image, tf.stack([1]))
         image_list = reader.image_list
@@ -224,11 +225,8 @@ def main():
         #TODO save this 
         img_id , img_ext = img_split[-1].split('.')
         img_path = os.path.join(DATA_DIRECTORY, img_id+".{}".format(img_ext))
+        msk = crop_all(img_path, parsing_,classes=args.classes)
         try:
-            if args.classes == 'LIP':
-                msk = crop_all(img_path, parsing_)
-            else:
-                msk = crop_images(img_path, parsing_)
             if msk.size != 0:
                 for cropped_img, class_idx in msk:
                     label = LABELS[class_idx]
@@ -236,9 +234,15 @@ def main():
                     color_output = os.path.join(args.output_dir,label,img_id)
                     parsing_im.save('{}_vis.{}'.format(color_output,img_ext))
                     if args.pattern:
-                        pattern_output = os.path.join(pattern_output_dir,label,img_id)
-                        parsing_im.save('{}_vis.{}'.format(pattern_output,img_ext))
-        except:
+                        pattern_output = os.path.join(pattern_output_dir, label,img_id)
+                        parsing_im.save('{}_vis.{}'.format(pattern_output, img_ext))
+                    if args.save_source:
+                        image=Image.open(img_path)
+                        image.save(os.path.join(args.output_dir, label, img_id+'.'+img_ext))
+                        image.close()
+                        
+        except Exception as e:
+            print(e)
             print("Skipped Image {}".format(img_id))
             continue
     coord.request_stop()

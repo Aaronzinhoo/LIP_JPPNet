@@ -72,7 +72,7 @@ def random_crop_and_pad_image_and_labels(image, label, crop_h, crop_w, ignore_la
     label_crop.set_shape((crop_h,crop_w, 1))
     return img_crop, label_crop  
 
-def read_labeled_image_list(data_dir, data_list, buffer_end,buff_size):
+def read_labeled_image_list(data_dir, data_list, buffer_end):
     """Reads txt file containing paths to images and ground truth masks.
     
     Args:
@@ -123,7 +123,7 @@ class ImageReader(object):
        masks from the disk, and enqueues them into a TensorFlow queue.
     '''
 
-    def __init__(self, data_dir, data_list, input_size, random_scale, random_mirror, coord, buffer_end, buff_size):
+    def __init__(self, data_dir, data_list, input_size, random_scale, random_mirror, coord, buffer_end):
         '''Initialise an ImageReader.
         
         Args:
@@ -139,8 +139,7 @@ class ImageReader(object):
         self.input_size = input_size
         self.coord = coord
         self.buffer_end = buffer_end
-        self.buff_size = buff_size
-        self.image_list = read_labeled_image_list(self.data_dir, self.data_list, self.buffer_end, self.buff_size)
+        self.image_list = read_labeled_image_list(self.data_dir, self.data_list, self.buffer_end)
         self.images = tf.convert_to_tensor(self.image_list, dtype=tf.string)
         self.queue = tf.train.slice_input_producer([self.images],
                                                    shuffle=input_size is not None) # not shuffling if it is val

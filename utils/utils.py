@@ -16,6 +16,7 @@ dress_index = 6
 jumpsuit_index=10
 full_index = [dress_index, jumpsuit_index]
 
+
 n_classes = 20
 # colour map
 label_colours = [(0,0,0)
@@ -29,29 +30,17 @@ label_colours = [(0,0,0)
                 ,(85,255,170),(170,255,85),(255,255,0),(255,170,0)]
                 # 16=LeftLeg, 17=RightLeg, 18=LeftShoe, 19=RightShoe
 
-
-# conditions to mask the images clothing
-# this step create masks where false means the value isnt part of the class
-top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
-bottom_mask_cond = [mask != pants_index, mask != skirt_index]
-full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
-conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
-# group the clothing category indexes
-indexes = [tops_index, bottoms_index, full_index]
-
-# group the clothing category indexes and conds for crop_all
-all_conditions = []
-all_indexes = []
-for i in range(1,len(label_colours)):
-    if i==2:
-        continue
-    all_conditions.append([mask != i])
-    all_indexes.append([i])
-
-
 # image mean
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
-    
+
+def make_dir_heirarchy(root_dir, subdirs):
+    if not os.path.exists(root_dir):
+        os.makedirs(root_dir)
+    for subdir in subdirs:
+        subdir_path = os.path.join(root_dir, subdir)
+        if not os.path.exists(subdir_path):
+            os.mkdir(subdir_path)
+
 def decode_labels(mask, num_images=1, num_classes=20):
     """Decode batch of segmentation masks.
     
@@ -79,9 +68,8 @@ def decode_labels(mask, num_images=1, num_classes=20):
 def crop_images(img_path, mask, num_images=1, classes='lip'):
     """ Black out the original image where the pixels are categorized as unimportant objects"""
 
-    conds=None
-    indices=None
-    
+    conditions=[]
+    indexes=[]
     n, h, w, c = mask.shape
     assert(n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (n, num_images)
     
@@ -93,19 +81,27 @@ def crop_images(img_path, mask, num_images=1, classes='lip'):
     image_array = image_array.reshape(1,image_array.shape[0],image_array.shape[1],
                                       image_array.shape[2])
     
+    # conditions to mask the images clothing
+    # this step create masks where false means the value isnt part of the class
     if classes=='fashion':
-        conds = conditions
-        indices=indexes
-    elif classes=='lip':
-        conds=all_conditions
-        indices=all_indexes
-
+        top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
+        bottom_mask_cond = [mask != pants_index, mask != skirt_index]
+        full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
+        conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
+        indexes = [tops_index, bottoms_index, full_index]
+    if classes=='lip':
+        for i in range(1,len(label_colours)):
+            if i==2:
+                continue
+            conditions.append([mask != i])
+            indexes.append([i])
+        
     outputs = []
     #create a blank outfile file for the mask
     for i in range(num_images):
-        for j, mask_cond in enumerate(conds):
+        for j, mask_cond in enumerate(conditions):
             # zero out objects that arent top/bottom/full
-            clothes_idx = indices[j]
+            clothes_idx = indexes[j]
             result = any(elem in mask  for elem in clothes_idx)
             if result:
                 # get the mask from masked_where, returns true where mask condition is true

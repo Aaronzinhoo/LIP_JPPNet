@@ -29,7 +29,7 @@ parser.add_argument('--output_dir' , default='./output',type=str,help="output di
 parser.add_argument('--buffer_size', default=500,help='current size of dir')
 parser.add_argument('--interval_size', default=20,help='max size that jpp should process')
 parser.add_argument('--label_file' , default=1)
-parser.add_argument('--classes' , default="fashion",help="Possible classes are fashion or LIP")
+parser.add_argument('--classes' , default="lip",choices=['fashion','lip'],help="Classes decide which labeling to use for the predictions and directory heirarchy")
 parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
 parser.add_argument('--save_source', '-s',action='store_true',help='store original images in dir')
@@ -225,7 +225,7 @@ def main():
         #TODO save this 
         img_id , img_ext = img_split[-1].split('.')
         img_path = os.path.join(DATA_DIRECTORY, img_id+".{}".format(img_ext))
-        msk = crop_all(img_path, parsing_,classes=args.classes)
+        msk = crop_images(img_path, parsing_,classes=args.classes)
         try:
             if msk.size != 0:
                 for cropped_img, class_idx in msk:

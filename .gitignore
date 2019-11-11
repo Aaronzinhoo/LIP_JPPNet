@@ -4,6 +4,7 @@ logs/
 model/
 results/
 datasets/examples/list/
+datasets/**/*.txt
 *.pyc
 *.orig
 *.txt

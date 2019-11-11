@@ -16,6 +16,7 @@ dress_index = 6
 jumpsuit_index=10
 full_index = [dress_index, jumpsuit_index]
 
+
 n_classes = 20
 # colour map
 label_colours = [(0,0,0)
@@ -28,9 +29,18 @@ label_colours = [(0,0,0)
                 # 11=Scarf, 12=Skirt, 13=Face, 14=LeftArm, 15=RightArm
                 ,(85,255,170),(170,255,85),(255,255,0),(255,170,0)]
                 # 16=LeftLeg, 17=RightLeg, 18=LeftShoe, 19=RightShoe
+
 # image mean
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
-    
+
+def make_dir_heirarchy(root_dir, subdirs):
+    if not os.path.exists(root_dir):
+        os.makedirs(root_dir)
+    for subdir in subdirs:
+        subdir_path = os.path.join(root_dir, subdir)
+        if not os.path.exists(subdir_path):
+            os.mkdir(subdir_path)
+
 def decode_labels(mask, num_images=1, num_classes=20):
     """Decode batch of segmentation masks.
     
@@ -55,9 +65,11 @@ def decode_labels(mask, num_images=1, num_classes=20):
       outputs[i] = np.array(img)
     return outputs
 
-def crop_images(img_path, mask, num_images=1,num_classes=20):
+def crop_images(img_path, mask, num_images=1, classes='lip'):
     """ Black out the original image where the pixels are categorized as unimportant objects"""
 
+    conditions=[]
+    indexes=[]
     n, h, w, c = mask.shape
     assert(n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (n, num_images)
     
@@ -68,15 +80,22 @@ def crop_images(img_path, mask, num_images=1,num_classes=20):
     image_array = np.array(image) # should remove [] if you have more than one image
     image_array = image_array.reshape(1,image_array.shape[0],image_array.shape[1],
                                       image_array.shape[2])
-    #conditions to mask the images clothing
-    top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
-    bottom_mask_cond = [mask != pants_index, mask != skirt_index]
-    full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
-    conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
-
-    # group the clothing category indexes
-    indexes = [tops_index, bottoms_index, full_index]
     
+    # conditions to mask the images clothing
+    # this step create masks where false means the value isnt part of the class
+    if classes=='fashion':
+        top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
+        bottom_mask_cond = [mask != pants_index, mask != skirt_index]
+        full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
+        conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
+        indexes = [tops_index, bottoms_index, full_index]
+    if classes=='lip':
+        for i in range(1,len(label_colours)):
+            if i==2:
+                continue
+            conditions.append([mask != i])
+            indexes.append([i])
+        
     outputs = []
     #create a blank outfile file for the mask
     for i in range(num_images):
@@ -85,42 +104,8 @@ def crop_images(img_path, mask, num_images=1,num_classes=20):
             clothes_idx = indexes[j]
             result = any(elem in mask  for elem in clothes_idx)
             if result:
-                image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
-                image_copy = image_array.copy()
-                image_copy = np.where(image_mask, label_colours[0], image_copy)
-                outputs.append((image_copy[0,:,:,:].astype('uint8'), j))
-    return np.array(outputs)
-
-def crop_all(img_path, mask, num_images=1,num_classes=20):
-    """ Black out the original image where the pixels are categorized as unimportant objects"""
-
-    n, h, w, c = mask.shape
-    assert(n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (n, num_images)
-    
-    #create a copy of the original image
-    image = Image.open(img_path)
-    if len(image.split()) == 4 or image.mode == 'RGBA':
-        image = image.convert('RGB')
-    image_array = np.array(image) # should remove [] if you have more than one image
-    image_array = image_array.reshape(1,image_array.shape[0],image_array.shape[1],
-                                      image_array.shape[2])
-    #conditions to mask the images clothing
-    top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
-    bottom_mask_cond = [mask != pants_index, mask != skirt_index]
-    full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
-    conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
-
-    # group the clothing category indexes
-    indexes = [tops_index, bottoms_index, full_index]
-    
-    outputs = []
-    #create a blank outfile file for the mask
-    for i in range(num_images):
-        for j, mask_cond in enumerate(conditions):
-            # zero out objects that arent top/bottom/full
-            clothes_idx = indexes[j]
-            result = any(elem in mask  for elem in clothes_idx)
-            if result:
+                # get the mask from masked_where, returns true where mask condition is true
+                # if the mask returns true for either index store it as this label 
                 image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
                 image_copy = image_array.copy()
                 image_copy = np.where(image_mask, label_colours[0], image_copy)

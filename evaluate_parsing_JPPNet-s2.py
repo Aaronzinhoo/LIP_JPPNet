@@ -8,6 +8,7 @@ import cv2
 import sys
 import argparse
 import glob
+from pathlib import Path
 from PIL import Image
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
@@ -29,7 +30,7 @@ parser.add_argument('--output_dir' , default='./output',type=str,help="output di
 parser.add_argument('--buffer_size', default=500,help='current size of dir')
 parser.add_argument('--interval_size', default=20,help='max size that jpp should process')
 parser.add_argument('--label_file' , default=1)
-parser.add_argument('--classes' , default="lip",choices=['fashion','lip'],help="Classes decide which labeling to use for the predictions and directory heirarchy")
+parser.add_argument('--classes' , default="fashion",choices=['fashion','lip'],help="Classes decide which labeling to use for the predictions and directory heirarchy")
 parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
 parser.add_argument('--save_source', '-s',action='store_true',help='store original images in dir')
@@ -39,24 +40,21 @@ N_CLASSES = 20
 INPUT_SIZE = (384, 384)
 
 #number of IMAGES in dir
-DATA_LIST_PATH_ROOT = 'LIP_JPPNet/datasets/examples/list/'
-DATA_LIST_PATH=os.path.join(DATA_LIST_PATH_ROOT, 'val'+str(args.label_file)+'.txt')
-RESTORE_FROM = 'LIP_JPPNet/checkpoint'
+BASE =  Path(__file__).resolve().parent
+DATA_LIST_PATH= str(BASE / 'datasets' / 'list' / 'val{}.txt'.format(args.label_file))
+RESTORE_FROM = str(BASE / 'checkpoint')
 
 
 def main():
     """Create the model and start the evaluation process."""
     LABELS=[]
     # grab the labels from user file
-    if args.classes == 'lip':
-        with open('LIP_JPPNet/labels/lip_labels.txt', 'r') as f:
+    try:
+        with open(BASE / 'datasets' / 'labels' / '{}_labels.txt'.format(args.classes) , 'r') as f:
             for line in f:
                 LABELS.append(line.strip('\n'))
-                
-    elif args.classes == 'fashion':
-        LABELS = ['top', 'bottom', 'full']
-    else:
-        print("Error No Class Given")
+    except Exception as e:
+        print("{} No Label file for dataset {}".format(e,args.classes))
         sys.exit(1)
 
     pattern_output_dir=''
@@ -213,7 +211,6 @@ def main():
     
     # Start queue threads.
     threads = tf.train.start_queue_runners(coord=coord, sess=sess)
-    #print(image_list , "     ", len(image_list))
     print("Prediciting Now")
     # Iterate over training steps.
     for step in range(NUM_STEPS):

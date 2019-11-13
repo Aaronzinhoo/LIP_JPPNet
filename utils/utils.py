@@ -15,8 +15,6 @@ bottoms_index = [pants_index, skirt_index]
 dress_index = 6
 jumpsuit_index=10
 full_index = [dress_index, jumpsuit_index]
-
-
 n_classes = 20
 # colour map
 label_colours = [(0,0,0)

@@ -1,32 +1,25 @@
 #!/bin/bash/env 
 
 from __future__ import print_function
-from datetime import datetime
 import os
-import time
-import cv2
 import sys
 import argparse
 import glob
 from pathlib import Path
-from PIL import Image
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
-#from utils import *
 from utils.utils import *
 from LIP_model import *
 from utils.image_reader import ImageReader
 from utils.model import JPPNetModel
 
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.30)
 sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
 parser = argparse.ArgumentParser(description = "classify clothes")
-parser.add_argument('--input_dir' , default='./' , type=str, help="dir of original images")
-parser.add_argument('--output_dir' , default='./output',type=str,help="output dir for results")
+parser.add_argument('input_dir' , default='./' , type=str, help="dir of original images")
+parser.add_argument('output_dir' , default='./output',type=str,help="output dir for results")
 parser.add_argument('--buffer_size', default=500,help='current size of dir')
 parser.add_argument('--interval_size', default=20,help='max size that jpp should process')
 parser.add_argument('--label_file' , default=1)
@@ -68,7 +61,6 @@ def main():
     # interval size is the size of the buffer jpp will categorize
     interval_size = int(args.interval_size)
     buffer_end = int(args.buffer_size)
-    buffer_start = buffer_end-interval_size
 
     # sort the directory contents by why they were created in the dir
     # image paths are relatove paths !!
@@ -79,12 +71,8 @@ def main():
     time_sorted_list = sorted(full_list, key=os.path.getctime)
     # relative sorted path
     sorted_filename_list = [ os.path.basename(i) for i in time_sorted_list]
-    # only get images up to the buffer size if needed
-    DATA_LIST=None
-    if len(sorted_filename_list[buffer_start:]) < interval_size:
-        DATA_LIST = sorted_filename_list[buffer_start:]
-    else:
-        DATA_LIST = sorted_filename_list[buffer_start : buffer_end]
+    # only get images up to the buffer size
+    DATA_LIST = sorted_filename_list[max(0,buffer_end-interval_size) : buffer_end]
     
     
     # create label file for data loader and get number of IMAGES
@@ -226,6 +214,9 @@ def main():
         try:
             if msk.size != 0:
                 for cropped_img, class_idx in msk:
+                    # these classes are meant to have low colored pixel density since small
+                    if not class_idx in [0,1,2,6,9,11,16,17] and not validate_mask(cropped_img):
+                        continue
                     label = LABELS[class_idx]
                     parsing_im = Image.fromarray(cropped_img)
                     color_output = os.path.join(args.output_dir,label,img_id)

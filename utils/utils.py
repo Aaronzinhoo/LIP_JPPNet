@@ -1,5 +1,6 @@
 from PIL import Image
 import numpy as np
+import cv2
 import tensorflow as tf
 import os
 import scipy.misc
@@ -30,6 +31,16 @@ label_colours = [(0,0,0)
 
 # image mean
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
+
+def validate_mask(mask , threshold=.01):
+    """
+    mask should be numpy array so operations can be performed by cv2
+    returns True if percentage of colored pixels exceed threshold (keep this image)
+    """
+    MIN = np.array([1, 1, 1], np.uint8)
+    MAX = np.array([255, 255, 255], np.uint8)
+    dst = cv2.inRange(mask, MIN, MAX)
+    return int(mask.size*threshold) < cv2.countNonZero(dst)
 
 def make_dir_heirarchy(root_dir, subdirs):
     if not os.path.exists(root_dir):
@@ -88,8 +99,9 @@ def crop_images(img_path, mask, num_images=1, classes='lip'):
         conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
         indexes = [tops_index, bottoms_index, full_index]
     if classes=='lip':
-        for i in range(1,len(label_colours)):
-            if i==2:
+        for i in range(len(label_colours)):
+            # skip hair and background labels
+            if i==2 or i==0:
                 continue
             conditions.append([mask != i])
             indexes.append([i])
@@ -97,6 +109,7 @@ def crop_images(img_path, mask, num_images=1, classes='lip'):
     outputs = []
     #create a blank outfile file for the mask
     for i in range(num_images):
+        # j will be class when returned to main
         for j, mask_cond in enumerate(conditions):
             # zero out objects that arent top/bottom/full
             clothes_idx = indexes[j]
@@ -105,8 +118,7 @@ def crop_images(img_path, mask, num_images=1, classes='lip'):
                 # get the mask from masked_where, returns true where mask condition is true
                 # if the mask returns true for either index store it as this label 
                 image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
-                image_copy = image_array.copy()
-                image_copy = np.where(image_mask, label_colours[0], image_copy)
+                image_copy = np.where(image_mask, label_colours[0], image_array)
                 outputs.append((image_copy[0,:,:,:].astype('uint8'), j))
     return np.array(outputs)
 

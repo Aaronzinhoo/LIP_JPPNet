@@ -12,6 +12,7 @@ This distribution provides a publicly available implementation for the key model
 
 We simplify the network to solve human parsing by exploring a novel self-supervised structure-sensitive learning approach, which imposes human pose structures into the parsing results without resorting to extra supervision. There is also a public implementation of this self-supervised structure-sensitive JPPNet ([SS-JPPNet](https://github.com/Engineering-Course/LIP_SSL)).
 
+## NOTE: ENSURE NAMES IN FILES DO NOT HAVE SPACES!
 
 ### Look into People (LIP) Dataset
 

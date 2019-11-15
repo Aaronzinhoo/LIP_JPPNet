@@ -81,7 +81,7 @@ def main():
     NUM_STEPS = 0
     with open(DATA_LIST_PATH, 'w+') as f:
         for image in DATA_LIST:
-            if image.split('.')[-1] in ['jpg','png','jpeg']:
+            if image.split('.')[-1] in ['jpg','png','jpeg','JPG','PNG','JPEG']:
                 f.write('/'+image+'\n')
                 NUM_STEPS += 1
                 

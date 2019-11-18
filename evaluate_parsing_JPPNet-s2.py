@@ -206,10 +206,9 @@ def main():
         if step % 100 == 0:
             print('step {:d}'.format(step))
             print(image_list[step])
-        img_split = image_list[step].split('/')
+        img_name = image_list[step].split('/')[-1]
         #TODO save this 
-        img_id , img_ext = img_split[-1].split('.')
-        img_path = os.path.join(DATA_DIRECTORY, img_id+".{}".format(img_ext))
+        img_path = os.path.join(DATA_DIRECTORY, img_name)
         msk = crop_images(img_path, parsing_,classes=args.classes)
         try:
             if msk.size != 0:
@@ -219,14 +218,14 @@ def main():
                         continue
                     label = LABELS[class_idx]
                     parsing_im = Image.fromarray(cropped_img)
-                    color_output = os.path.join(args.output_dir,label,img_id)
-                    parsing_im.save('{}_vis.{}'.format(color_output,img_ext))
+                    parsing_im.save(os.path.join(args.output_dir,label,img_name))
+                    # add image to a dir for pattern classification
                     if args.pattern:
-                        pattern_output = os.path.join(pattern_output_dir, label,img_id)
-                        parsing_im.save('{}_vis.{}'.format(pattern_output, img_ext))
+                        parsing_im.save(os.path.join(pattern_output_dir, label,img_name))
+                    # save the original in the same folder as segmented images (testing only)
                     if args.save_source:
                         image=Image.open(img_path)
-                        image.save(os.path.join(args.output_dir, label, img_id+'.'+img_ext))
+                        image.save(os.path.join(args.output_dir, label, img_name))
                         image.close()
                         
         except Exception as e:

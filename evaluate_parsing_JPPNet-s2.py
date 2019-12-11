@@ -37,10 +37,12 @@ BASE =  Path(__file__).resolve().parent
 DATA_LIST_PATH= str(BASE / 'datasets' / 'list' / 'val{}.txt'.format(args.label_file))
 RESTORE_FROM = str(BASE / 'checkpoint')
 
-
 def main():
     """Create the model and start the evaluation process."""
     LABELS=[]
+    ignore_labels = []
+    if args.classes=='lip':
+        ignore_labels = [0,1,2,6,9,11,16,17]
     # grab the labels from user file
     try:
         with open(BASE / 'datasets' / 'labels' / '{}_labels.txt'.format(args.classes) , 'r') as f:
@@ -52,12 +54,12 @@ def main():
 
     pattern_output_dir=''
     make_dir_heirarchy(args.output_dir,LABELS)
+    # PIPELINE: make output dir for pattern to classify after pipeline finished
     if args.pattern:
         pattern_output_dir = args.output_dir + '_pattern'
         make_dir_heirarchy(pattern_output_dir,LABELS)
         
-    # if you want just the filenames sorted, simply remove the dir from each
-    # buffer size is current index of last element in buffer
+    # buffer end is current index of last element in buffer when job ran
     # interval size is the size of the buffer jpp will categorize
     interval_size = int(args.interval_size)
     buffer_end = int(args.buffer_size)
@@ -74,7 +76,6 @@ def main():
     # only get images up to the buffer size
     DATA_LIST = sorted_filename_list[max(0,buffer_end-interval_size) : buffer_end]
     
-    
     # create label file for data loader and get number of IMAGES
     # image is concatenated with DATA_DIRECTORY in ImageReader init function!
     # filter videos (mainly for security when not using fullbody detection)
@@ -84,11 +85,10 @@ def main():
             if image.split('.')[-1] in ['jpg','png','jpeg','JPG','PNG','JPEG']:
                 f.write('/'+image+'\n')
                 NUM_STEPS += 1
-                
-    print("YOU HAVE THIS MANY ACTUAL IMAGES ",NUM_STEPS)
     if NUM_STEPS==0:
-        print("Exiting Since no Images Found")
+        print("Exiting: No Images Found")
         return -1
+    print("YOU HAVE THIS MANY ACTUAL IMAGES ",NUM_STEPS)
     # Create queue coordinator.
     coord = tf.train.Coordinator()
     h, w = INPUT_SIZE
@@ -214,7 +214,7 @@ def main():
             if msk.size != 0:
                 for cropped_img, class_idx in msk:
                     # these classes are meant to have low colored pixel density since small
-                    if not class_idx in [0,1,2,6,9,11,16,17] and not validate_mask(cropped_img):
+                    if not class_idx in ignore_labels and not validate_mask(cropped_img):
                         continue
                     label = LABELS[class_idx]
                     parsing_im = Image.fromarray(cropped_img)

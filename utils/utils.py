@@ -74,7 +74,29 @@ def decode_labels(mask, num_images=1, num_classes=20):
       outputs[i] = np.array(img)
     return outputs
 
-def crop_images(img_path, mask, num_images=1, classes='lip'):
+def _get_bbox_dim(image, all_contours=False):
+    """
+    returns cropped image that fits largest contour found
+    """
+    img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    img_mask = cv2.inRange(img_gray, 1, 255)
+    contours, heirarchy = cv2.findContours(img_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    if all_contours:
+        height, width = img_mask.shape
+        min_x, min_y = width, height
+        max_x = max_y = 0
+        # computes the bounding box for the contour, and draws it on the frame,
+        for contour in contours:
+            (x,y,w,h) = cv2.boundingRect(contour)
+            min_x, max_x = min(x, min_x), max(x+w, max_x)
+            min_y, max_y = min(y, min_y), max(y+h, max_y)
+        return max_y-min_y,max_x-min_x,min_y,min_x
+    contour_sizes = [(cv2.contourArea(contour), contour) for contour in contours]
+    biggest_contour = max(contour_sizes, key=lambda x: x[0])[1]
+    x,y,w,h = cv2.boundingRect(biggest_contour)
+    return (h,w,y,x)
+
+def segment_images(img_path, mask, classes='lip', num_images=1):
     """ Black out the original image where the pixels are categorized as unimportant objects"""
 
     conditions=[]
@@ -121,6 +143,56 @@ def crop_images(img_path, mask, num_images=1, classes='lip'):
                 image_copy = np.where(image_mask, label_colours[0], image_array)
                 outputs.append((image_copy[0,:,:,:].astype('uint8'), j))
     return np.array(outputs)
+
+def crop_images(img_path, mask, classes='lip', padding=100 ,num_images=1):
+    """ Black out the original image where the pixels are categorized as unimportant objects"""
+
+    conditions=[]
+    indexes=[]
+    n, h, w, c = mask.shape
+    assert(n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (n, num_images)
+    
+    #create a copy of the original image
+    image = cv2.imread(img_path)
+    #image = Image.open(img_path)
+    #image_array = np.array(image) # should remove [] if you have more than one image
+    
+    # conditions to mask the images clothing
+    # this step create masks where false means the value isnt part of the class
+    if classes=='fashion':
+        top_mask_cond = [mask != upper_clothing_index, mask != coat_index]
+        bottom_mask_cond = [mask != pants_index, mask != skirt_index]
+        full_mask_cond = [mask != dress_index, mask != jumpsuit_index]
+        conditions = [top_mask_cond, bottom_mask_cond, full_mask_cond]
+        indexes = [tops_index, bottoms_index, full_index]
+    if classes=='lip':
+        for i in range(len(label_colours)):
+            # skip hair and background labels
+            if i==2 or i==0:
+                continue
+            conditions.append([mask != i])
+            indexes.append([i])
+        
+    outputs = []
+    #create a blank outfile file for the mask
+    for i in range(num_images):
+        # j will be class when returned to main
+        for j, mask_cond in enumerate(conditions):
+            # zero out objects that arent top/bottom/full
+            clothes_idx = indexes[j]
+            result = any(elem in mask  for elem in clothes_idx)
+            if result:
+                # get the mask from masked_where, returns true where mask condition is true
+                # if the mask returns true for either index store it as this label 
+                image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
+                image_copy = np.where(image_mask, label_colours[0], image)
+                h,w,y,x = _get_bbox_dim(image_copy[0].astype('uint8'),all_contours=True)
+                y = max(0,y-padding)
+                x = max(0,x-padding)
+                image_copy = image[y:y+h+padding, x:x+w+padding]
+                outputs.append((image_copy[:,:,:].astype('uint8'), j))
+    return np.array(outputs)
+    
 
 def prepare_label(input_batch, new_size, one_hot=True):
     """Resize masks and perform one-hot encoding.

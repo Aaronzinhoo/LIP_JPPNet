@@ -27,6 +27,8 @@ parser.add_argument('--classes' , default="fashion",choices=['fashion','lip'],he
 parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
 parser.add_argument('--save_source', '-s',action='store_true',help='store original images in dir')
+parser.add_argument('--style_preprocess',action='store_true',
+                    help='crop images instead of segmenting for style classification')
 args = parser.parse_args()
 
 N_CLASSES = 20
@@ -209,7 +211,10 @@ def main():
         img_name = image_list[step].split('/')[-1]
         #TODO save this 
         img_path = os.path.join(DATA_DIRECTORY, img_name)
-        msk = crop_images(img_path, parsing_,classes=args.classes)
+        if args.style_preprocess:
+            msk = crop_images(img_path, parsing_,classes=args.classes)
+        else:
+            msk = segment_images(img_path, parsing_,classes=args.classes)
         try:
             if msk.size != 0:
                 for cropped_img, class_idx in msk:
@@ -218,10 +223,13 @@ def main():
                         continue
                     label = LABELS[class_idx]
                     parsing_im = Image.fromarray(cropped_img)
-                    parsing_im.save(os.path.join(args.output_dir,label,img_name))
+                    cv2.imwrite(os.path.join(args.output_dir,label,img_name),cropped_img)
+                    # cropped_img.imwrite(os.path.join(args.output_dir,label,img_name))
                     # add image to a dir for pattern classification
                     if args.pattern:
-                        parsing_im.save(os.path.join(pattern_output_dir, label,img_name))
+                        cv2.imwrite(os.path.join(pattern_output_dir, label,img_name),
+                                    cropped_img)
+                        # parsing_im.save(os.path.join(pattern_output_dir, label,img_name))
                     # save the original in the same folder as segmented images (testing only)
                     if args.save_source:
                         image=Image.open(img_path)
@@ -230,7 +238,7 @@ def main():
                         
         except Exception as e:
             print(e)
-            print("Skipped Image {}".format(img_id))
+            print("Skipped Image {}".format(img_name))
             continue
     coord.request_stop()
     coord.join(threads)

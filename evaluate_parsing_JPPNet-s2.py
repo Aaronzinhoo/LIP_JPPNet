@@ -1,38 +1,33 @@
-#!/bin/bash/env 
-
 from __future__ import print_function
 import os
 import sys
 import argparse
-import glob
+
 from pathlib import Path
 import tensorflow as tf
-import numpy as np
+
 from utils.utils import *
 from LIP_model import *
 from utils.image_reader import ImageReader
 from utils.model import JPPNetModel
 
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.30)
 sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
-parser = argparse.ArgumentParser(description = "classify clothes as top, bottom, or full")
-parser.add_argument('input_dir' , default='./' , type=str, help="dir of original images")
-parser.add_argument('output_dir' , default='./output',type=str,help="output dir for results")
+parser = argparse.ArgumentParser(description="classify clothes as top, bottom, or full")
+parser.add_argument('input_dir', default='./', type=str, help="dir of original images")
+parser.add_argument('output_dir', default='./output',type=str,help="output dir for results")
 parser.add_argument('--buffer_size', default=500,help='current size of dir')
 parser.add_argument('--interval_size', default=20,help='max size that jpp should process')
-parser.add_argument('--label_file' , default=1)
-parser.add_argument('--classes' , default="fashion",choices=['fashion','lip'],help="Classes decide which labeling to use for the predictions and directory heirarchy")
+parser.add_argument('--label_file', default=1)
+parser.add_argument('--classes', default="fashion",choices=['fashion','lip'],help="Classes decide which labeling to use for the predictions and directory heirarchy")
 parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
-parser.add_argument('--save_source', '-s',action='store_true',help='store original images in dir')
-parser.add_argument('--style_preprocess',action='store_true',
-<<<<<<< HEAD
+parser.add_argument('--save_source', '-s', action='store_true',
+                    help='store original images in dir')
+parser.add_argument('--style_preprocess', action='store_true',
                     help='crop bbox of objects instead of segmenting for style classification')
-=======
-                    help='crop images instead of segmenting for style classification')
->>>>>>> origin/master
 args = parser.parse_args()
 
 N_CLASSES = 20
@@ -213,17 +208,16 @@ def main():
             print('step {:d}'.format(step))
             print(image_list[step])
         img_name = image_list[step].split('/')[-1]
-        #TODO save this 
         img_path = os.path.join(DATA_DIRECTORY, img_name)
         if args.style_preprocess:
-            msk = crop_images(img_path, parsing_,classes=args.classes)
+            msk = crop_images(img_path, parsing_, classes=args.classes)
         else:
-            msk = segment_images(img_path, parsing_,classes=args.classes)
+            msk = segment_images(img_path, parsing_, classes=args.classes)
         try:
             if msk.size != 0:
                 for cropped_img, class_idx in msk:
                     # these classes are meant to have low colored pixel density since small
-                    if not class_idx in ignore_labels and not validate_mask(cropped_img):
+                    if class_idx not in ignore_labels and not validate_mask(cropped_img):
                         continue
                     label = LABELS[class_idx]
                     parsing_im = Image.fromarray(cropped_img)

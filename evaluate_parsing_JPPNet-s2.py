@@ -28,7 +28,11 @@ parser.add_argument('--pattern', '-p',action='store_true',
                     help='create output for pattern detection script to read from')
 parser.add_argument('--save_source', '-s',action='store_true',help='store original images in dir')
 parser.add_argument('--style_preprocess',action='store_true',
+<<<<<<< HEAD
                     help='crop bbox of objects instead of segmenting for style classification')
+=======
+                    help='crop images instead of segmenting for style classification')
+>>>>>>> origin/master
 args = parser.parse_args()
 
 N_CLASSES = 20

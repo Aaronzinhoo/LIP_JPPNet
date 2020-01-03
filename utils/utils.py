@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import tensorflow as tf
 import os
+import h5py
 import scipy.misc
 from scipy.stats import multivariate_normal
 import matplotlib.pyplot as plt
@@ -230,6 +231,43 @@ def inv_preprocess(imgs, num_images):
     outputs[i] = (imgs[i] + IMG_MEAN)[:, :, ::-1].astype(np.uint8)
   return outputs
 
+
+def store_many_hdf5(images, paths, label):
+    """ Stores an array of images to HDF5.
+        Parameters:
+        ---------------
+        images       images array, (N, X, X, 3) to be stored
+        paths        paths array, (N, 1) to be stored
+    """
+    num_images = len(images)
+    # Create a new HDF5 file
+    file = h5py.File(f"{label}_pattern_images.h5", "w")
+    # Create a dataset in the file
+    dataset = file.create_dataset(
+        "images", np.shape(images), h5py.h5t.STD_U8BE, data=images
+    )
+    paths_dataset = file.create_dataset(
+        "paths", np.shape(paths), h5py.h5t.STD_U8BE, data=label
+    )
+    file.close()
+
+def read_many_hdf5(label):
+    """ Reads image from HDF5.
+        Parameters:
+        ---------------
+        num_images   number of images to read
+
+        Returns:
+        ----------
+        images      images array, (N, X, X, 3) to be stored
+        paths      associated meta data, str path (N, 1)
+    """
+    images,paths = [],[]
+    # Open the HDF5 file
+    file = h5py.File(f"{label}_pattern_images.h5", "r+")
+    images = np.array(file["/images"]).astype("uint8")
+    paths = np.array(file["/paths"]).astype("uint8")
+    return zip(paths, images)
 
 def save(saver, sess, logdir, step):
     '''Save weights.   

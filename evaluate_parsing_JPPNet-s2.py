@@ -42,8 +42,8 @@ def main():
     """Create the model and start the evaluation process."""
     LABELS=[]
     ignore_labels = []
-    if args.classes=='lip':
-        ignore_labels = [0,1,2,6,9,11,16,17]
+    if args.classes == 'lip':
+        ignore_labels = [0, 1, 2, 6, 9, 11, 16, 17]
     # grab the labels from user file
     try:
         with open(BASE / 'datasets' / 'labels' / '{}_labels.txt'.format(args.classes) , 'r') as f:
@@ -53,12 +53,12 @@ def main():
         print("{} No Label file for dataset {}".format(e,args.classes))
         sys.exit(1)
 
+    make_dir_heirarchy(args.output_dir, LABELS)
     pattern_output_dir=''
-    make_dir_heirarchy(args.output_dir,LABELS)
     # PIPELINE: make output dir for pattern to classify after pipeline finished
     if args.pattern:
         pattern_output_dir = args.output_dir + '_pattern'
-        make_dir_heirarchy(pattern_output_dir,LABELS)
+        make_dir_heirarchy(pattern_output_dir, LABELS)
         
     # buffer end is current index of last element in buffer when job ran
     # interval size is the size of the buffer jpp will categorize
@@ -86,10 +86,14 @@ def main():
             if image.split('.')[-1] in ['jpg','png','jpeg','JPG','PNG','JPEG']:
                 f.write('/'+image+'\n')
                 NUM_STEPS += 1
-    if NUM_STEPS==0:
+    if NUM_STEPS == 0:
         print("Exiting: No Images Found")
         return -1
-    print("YOU HAVE THIS MANY ACTUAL IMAGES ",NUM_STEPS)
+    print("CLASSIFYING {} IMAGES".format(NUM_STEPS))
+
+    #############################
+    # LOAD NETWORK & DATA
+    ############################
     # Create queue coordinator.
     coord = tf.train.Coordinator()
     h, w = INPUT_SIZE
@@ -189,6 +193,7 @@ def main():
     
     sess.run(init)
     sess.run(tf.local_variables_initializer())
+    ######################################################
     
     # Load weights.
     loader = tf.train.Saver(var_list=restore_var)

@@ -33,7 +33,7 @@ label_colours = [(0,0,0)
 # image mean
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
 
-def validate_mask(mask , threshold=.01):
+def valid_mask(mask , threshold=.01):
     """
     mask should be numpy array so operations can be performed by cv2
     returns True if percentage of colored pixels exceed threshold (keep this image)
@@ -142,7 +142,7 @@ def segment_images(img_path, mask, classes='lip', num_images=1):
                 # if the mask returns true for either index store it as this label 
                 image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
                 image_copy = np.where(image_mask, label_colours[0], image_array)
-                outputs.append((image_copy[0,:,:,:].astype('uint8'), j))
+                outputs.append((image_copy[0, :, :, :].astype('uint8'), j))
     return np.array(outputs)
 
 def crop_images(img_path, mask, classes='lip', padding=100 ,num_images=1):
@@ -173,25 +173,24 @@ def crop_images(img_path, mask, classes='lip', padding=100 ,num_images=1):
                 continue
             conditions.append([mask != i])
             indexes.append([i])
-        
     outputs = []
-    #create a blank outfile file for the mask
+    # create a blank outfile file for the mask
     for i in range(num_images):
         # j will be class when returned to main
         for j, mask_cond in enumerate(conditions):
             # zero out objects that arent top/bottom/full
             clothes_idx = indexes[j]
-            result = any(elem in mask  for elem in clothes_idx)
+            result = any(elem in mask for elem in clothes_idx)
             if result:
                 # get the mask from masked_where, returns true where mask condition is true
                 # if the mask returns true for either index store it as this label 
                 image_mask = np.ma.masked_where(np.all(mask_cond, axis=0), mask).mask
                 image_copy = np.where(image_mask, label_colours[0], image)
                 h,w,y,x = _get_bbox_dim(image_copy[0].astype('uint8'),all_contours=True)
-                y = max(0,y-padding)
-                x = max(0,x-padding)
+                y = max(0, y-padding)
+                x = max(0, x-padding)
                 image_copy = image[y:y+h+padding, x:x+w+padding]
-                outputs.append((image_copy[:,:,:].astype('uint8'), j))
+                outputs.append((image_copy[:, :, :].astype('uint8'), j))
     return np.array(outputs)
     
 
@@ -256,7 +255,7 @@ def read_many_hdf5(label):
         Parameters:
         ---------------
         num_images   number of images to read
-
+ 
         Returns:
         ----------
         images      images array, (N, X, X, 3) to be stored

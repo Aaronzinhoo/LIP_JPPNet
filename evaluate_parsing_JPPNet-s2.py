@@ -220,13 +220,13 @@ def main():
         else:
             msk = segment_images(img_path, parsing_, classes=args.classes)
         if msk.size != 0:
-            try :
+            try:
                 for msk_image, label in msk:
                     if label not in ignore_labels and valid_mask(msk_image):
                         masked_images.append([img_name, LABELS[label], msk_image])
             except Exception as e:
-                    print(e, img_name)
-                    continue
+                print("JPP - ", e, img_name)
+                continue
     coord.request_stop()
     coord.join(threads)
     if args.save_images:

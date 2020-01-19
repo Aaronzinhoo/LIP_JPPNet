@@ -232,9 +232,9 @@ def main():
     if args.save_images:
         print("Saving Images")
         for name, label, image in masked_images:
-            cv2.imwrite(str(Path(args.output_dir) / label / name), image)
+            cv2.imwrite(str(Path(args.output_dir) / label / name), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
             if args.pattern:
-                cv2.imwrite(str(Path(pattern_output_dir) / label / name), image)
+                cv2.imwrite(str(Path(pattern_output_dir) / label / name), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
     
 if __name__ == '__main__':
     main()
